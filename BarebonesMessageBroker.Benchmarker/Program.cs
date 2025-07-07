@@ -15,9 +15,9 @@ public class BusPublishBenchmark
          _message = new
         {
             Id = "id:" + Guid.NewGuid().ToString(),
-            StringValues = "hello",
-            IntValues = 123,
-            LongValues = 456789L,
+            StringValue = "hello",
+            IntValue = 123,
+            LongValue = 456789L,
         };
         _bus = new BareBonesBus(new ServiceCollection());
     }
@@ -26,6 +26,10 @@ public class BusPublishBenchmark
     public async Task PublishSomeEvent()
     {
 
+        await _bus.Publish(_message, "benchmarkAssembly.SomeEvent");
+        await _bus.Publish(_message, "benchmarkAssembly.SomeEvent");
+        await _bus.Publish(_message, "benchmarkAssembly.SomeEvent");
+        await _bus.Publish(_message, "benchmarkAssembly.SomeEvent");
         await _bus.Publish(_message, "benchmarkAssembly.SomeEvent");
     }
 }

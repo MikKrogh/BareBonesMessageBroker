@@ -15,11 +15,12 @@ public class BusTests
         object sentEvent = new
         {
             Id = "id:" + Guid.NewGuid().ToString(),
-            StringValues = "hello",
-            IntValues = 123,
-            LongValues = 456789L,
+            StringValue = "hello",
+            IntValue = 123,
+            LongValue = 456789L,
         };
 
+        await bus.Publish(sentEvent, Constants.EventName);
         await bus.Publish(sentEvent, Constants.EventName);
     }
 }

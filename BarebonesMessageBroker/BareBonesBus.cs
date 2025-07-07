@@ -11,6 +11,9 @@ namespace BarebonesMessageBroker;
 public class BareBonesBus : IBus
 {
     private FrozenDictionary<string, Type[]> eventListerners = new Dictionary<string, Type[]>().ToFrozenDictionary();
+    private Dictionary<Type, Type> _cachedEventsForListeners = new Dictionary<Type, Type>();
+    private Dictionary<Type, Type[]> _cachedListenerDependencies = new Dictionary<Type, Type[]>();
+    private Dictionary<Type, PropertyInfo[]> _cachedEventProperties = new Dictionary<Type, PropertyInfo[]>();
     private readonly IServiceProvider _services;
     public BareBonesBus(IServiceProvider services)
     {
@@ -26,9 +29,11 @@ public class BareBonesBus : IBus
     {
         throw new NotImplementedException();
     }
+    //| PublishSomeEvent | 4.029 us | 0.0802 us | 0.1777 us | 0.2747 |    2.3 KB | + cahed props on event type
+    //| PublishSomeEvent | 4.966 us | 0.0981 us | 0.1241 us | 0.3204 |   2.62 KB | + events for listener cached
+    //| PublishSomeEvent | 5.407 us | 0.1051 us | 0.1329 us | 0.3738 |   3.09 KB | cache of listener services
+    //| PublishSomeEvent | 6.082 us | 0.1195 us | 0.1713 us | 0.4730 |   3.87 KB |  no cache
 
-    //| PublishSomeEvent | 1.477 us | 0.0327 us | 0.0939 us | 1.449 us | 0.1221 |   1.02 KB |
-    //| PublishSomeEvent | 1.286 us | 0.0257 us | 0.0414 us | 0.0916 |     792 B |  No catching or perf implementations
     public async Task Publish(object message, string EventType)
     {
         if (eventListerners.ContainsKey(EventType))
@@ -52,24 +57,31 @@ public class BareBonesBus : IBus
         }
     }
 
-    private static Type GetEventType(Type listenerType)
+    private  Type GetEventType(Type listenerType)
     {
-        var listenerInterface = listenerType.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType &&
-            i.GetGenericTypeDefinition() == typeof(Listener<>));
-        if (listenerInterface == null) throw new NoNullAllowedException($"Type {listenerType.FullName} does not implement Listener<TEvent>.");
+        if (!_cachedEventsForListeners.ContainsKey(listenerType))
+        {
+            var listenerInterface = listenerType.GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Listener<>));
+            if (listenerInterface == null) throw new NoNullAllowedException($"Type {listenerType.FullName} does not implement Listener<TEvent>.");
 
-        Type eventType = listenerInterface.GetGenericArguments()[0];
-        return eventType;
+            Type eventType = listenerInterface.GetGenericArguments()[0];
+            _cachedEventsForListeners.Add(listenerType, eventType);
+        }
+
+        return _cachedEventsForListeners[listenerType];
     }
 
     private object? CreateInstance(Type listenerType)
     {
-        var ctor = listenerType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
-        var listernerDependencies = ctor.GetParameters().Select(p => p.ParameterType);
-
+        if (!_cachedListenerDependencies.ContainsKey(listenerType))
+        {
+            var ctor = listenerType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
+            var dependencies = ctor.GetParameters().Select(p => p.ParameterType);
+            _cachedListenerDependencies.Add(listenerType, dependencies.ToArray());
+        }
         var services = new List<object>();
-        foreach (var dependency in listernerDependencies)
+        foreach (var dependency in _cachedListenerDependencies[listenerType])
         {
             var service = _services.GetService(dependency);
             if (service is null)
@@ -85,25 +97,25 @@ public class BareBonesBus : IBus
     {
         if (message == null) 
             return default;
+
         var messageProps = message.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-        var instanceProps = returnedInstance.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+        if (!_cachedEventProperties.ContainsKey(returnedInstance))
+        {
+            var instanceProps = returnedInstance.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            instanceProps = instanceProps.Where(p => p.CanWrite).ToArray();
+            _cachedEventProperties.Add(returnedInstance, instanceProps);
+        }
+
         var eventInstance = Activator.CreateInstance(returnedInstance);
         if (eventInstance is null)
             throw new InvalidOperationException($"Could not create instance of event type {returnedInstance.FullName}.");
-        try
+
+        foreach (var property in _cachedEventProperties[returnedInstance])
         {
-            foreach (var property in instanceProps)
-            {
-                if (property.CanWrite)
-                {
-                    var value = message.GetType().GetProperty(property.Name)?.GetValue(message);
-                    property.SetValue(eventInstance, value);
-                }
-            }
+            var value = message.GetType().GetProperty(property.Name)?.GetValue(message);
+            property.SetValue(eventInstance, value);            
         }
-        catch (Exception e)
-        {
-        }
+
         return (Tevent?)eventInstance;
     }
 }
