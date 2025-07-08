@@ -34,7 +34,7 @@ jobs:
       run: dotnet build --no-restore
     #- name: Test
      # run: dotnet test --no-build --verbosity normal
-
+    - run: ls -R
     - name: Generate NuGet package
       run: |
           dotnet pack BarebonesMessageBroker\BarebonesMessageBroker \
