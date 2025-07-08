@@ -16,7 +16,13 @@ jobs:
     permissions:
       contents: write
 
-    steps:
+    steps:    
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
     - name: Read and bump version
       id: versioning
       run: |
@@ -42,11 +48,7 @@ jobs:
         git add VERSION
         git commit -m "Bump version to ${{ steps.versioning.outputs.version }}"
         git push
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
+        
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
