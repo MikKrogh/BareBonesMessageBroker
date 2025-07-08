@@ -20,7 +20,7 @@ jobs:
     - name: Read and bump version
       id: versioning
       run: |
-        VERSION_FILE=VERSION
+        VERSION_FILE=Version
         VERSION=$(cat $VERSION_FILE)
 
         # Split version
