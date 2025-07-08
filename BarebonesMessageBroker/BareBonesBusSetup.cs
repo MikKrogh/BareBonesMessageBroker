@@ -13,14 +13,9 @@ internal class BareBonesBusSetup
         List<Type> listeners = GetEventListeners(assemblies);
 
         Dictionary<string, List<Type>> subscriptionsToMap = new();
-        foreach (var type in listeners)
+        foreach (var listener in listeners)
         {
-            var listenerInterface = type.GetInterfaces().FirstOrDefault(i =>
-                i.IsGenericType &&
-                i.GetGenericTypeDefinition() == typeof(Listener<>)
-            );
-
-            var eventType = listenerInterface?.GetGenericArguments().FirstOrDefault();
+            Type? eventType = GetEventTypeFromListener(listener);
             var eventNameProp = eventType?.GetProperty("EventName");
             if (eventNameProp?.PropertyType == typeof(string) && eventType is not null)
             {
@@ -32,7 +27,7 @@ internal class BareBonesBusSetup
                     {
                         subscriptionsToMap[eventName] = new List<Type>();
                     }
-                    subscriptionsToMap[eventName].Add(type);
+                    subscriptionsToMap[eventName].Add(listener);
                 }
             }
         }
@@ -41,6 +36,17 @@ internal class BareBonesBusSetup
             .ToFrozenDictionary();
         return result;
 
+    }
+
+    private static Type? GetEventTypeFromListener(Type type)
+    {
+        var listenerInterface = type.GetInterfaces().FirstOrDefault(i =>
+            i.IsGenericType &&
+            i.GetGenericTypeDefinition() == typeof(Listener<>)
+        );
+
+        var eventType = listenerInterface?.GetGenericArguments().FirstOrDefault();
+        return eventType;
     }
 
     private static List<Type> GetEventListeners(List<System.Reflection.Assembly> assemblies)
