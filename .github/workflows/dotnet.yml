@@ -11,22 +11,20 @@ on:
 permissions:
     contents: write
 jobs:
-  #bump-version:
-    #uses: ./.github/workflows/Bump-version.yml
+  bump-version:
+    uses: ./.github/workflows/Bump-version.yml
   build:
 
     runs-on: ubuntu-latest
 
       
-   # needs: bump-version  # wait for bump-version to finish
+    needs: bump-version  # wait for bump-version to finish
     steps:    
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    #- name: Print bumped version
-     # run: echo "New version is ${{ needs.bump-version.outputs.version }}"
         
     - name: Restore dependencies
       run: dotnet restore
