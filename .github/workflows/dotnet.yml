@@ -13,8 +13,35 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
+    - name: Read and bump version
+      id: versioning
+      run: |
+        VERSION_FILE=VERSION
+        VERSION=$(cat $VERSION_FILE)
+
+        # Split version
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+        PATCH=$((PATCH + 1))
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+
+        echo "Old version: $VERSION"
+        echo "New version: $NEW_VERSION"
+
+        echo "$NEW_VERSION" > $VERSION_FILE
+
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Commit bumped version
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git add VERSION
+        git commit -m "Bump version to ${{ steps.versioning.outputs.version }}"
+        git push
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
