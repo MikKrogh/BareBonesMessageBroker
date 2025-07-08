@@ -10,12 +10,15 @@ on:
     branches: [ "master" ]
 
 jobs:
+  bump-version:
+    uses: ./.github/workflows/Bump-version.yml
   build:
 
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+      
+    needs: bump-version  # wait for bump-version to finish
     steps:    
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -23,31 +26,6 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Read and bump version
-      id: versioning
-      run: |
-        VERSION_FILE=Version
-        VERSION=$(cat $VERSION_FILE)
-
-        # Split version
-        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-        PATCH=$((PATCH + 1))
-        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-
-        echo "Old version: $VERSION"
-        echo "New version: $NEW_VERSION"
-
-        echo "$NEW_VERSION" > $VERSION_FILE
-
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-    - name: Commit bumped version
-      run: |
-        git config user.name "github-actions"
-        git config user.email "github-actions@github.com"
-        git add Version
-        git commit -m "Bump version to ${{ steps.versioning.outputs.version }}"
-        git push
         
     - name: Restore dependencies
       run: dotnet restore
