@@ -8,15 +8,15 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
+permissions:
+    contents: write
 jobs:
   bump-version:
     uses: ./.github/workflows/Bump-version.yml
   build:
 
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
       
     needs: bump-version  # wait for bump-version to finish
     steps:    
