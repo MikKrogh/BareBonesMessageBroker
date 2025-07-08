@@ -37,7 +37,7 @@ jobs:
 
     - name: Generate NuGet package
       run: |
-          dotnet pack BareBonesMessageBroker/BareBonesMessageBroker \
+          dotnet pack BarebonesMessageBroker/BarebonesMessageBroker \
           --configuration Release \
           -p:PackageVersion=${{ needs.bump-version.outputs.version }} \
           -p:RepositoryUrl=https://github.com/MikKrogh/BareBonesMessageBroker \
