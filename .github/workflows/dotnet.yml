@@ -45,7 +45,7 @@ jobs:
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"
-        git add VERSION
+        git add Version
         git commit -m "Bump version to ${{ steps.versioning.outputs.version }}"
         git push
         
