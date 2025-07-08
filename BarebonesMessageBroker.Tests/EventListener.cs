@@ -7,22 +7,8 @@ internal static class Constants
 
 internal class EventListener : Listener<SpecificEventForListener>
 {
-    public SpecificEventForListener? RecievedEvent = null;
-    internal readonly ListernerMonitor _someService;
-    private readonly RandomService randomService;
-
-    public EventListener(ListernerMonitor someService, RandomService randomService)
-    {
-        _someService = someService ?? throw new ArgumentNullException(nameof(someService));
-        this.randomService = randomService;
-    }
-    public EventListener()
-    {
-        
-    }
     public Task Handle(SpecificEventForListener t)
     {
-        RecievedEvent = t;
         return Task.CompletedTask;
     }    
 }

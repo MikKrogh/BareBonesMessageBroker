@@ -3,13 +3,9 @@ namespace BarebonesMessageBroker.Tests;
 public class BusTests
 {
     [Fact]
-    public async Task WhenOneListenerExists_WhenEventIsPublished_ThenListenerReacts()
+    public async Task WhenOneListenerExists_WhenEventIsPublished_ThenListenerGetsCorrectlyMappedProperties()
     {
         ServiceCollection serviceCollection = new ServiceCollection();
-        var monitor = new ListernerMonitor();
-        var randomService = new RandomService();
-        serviceCollection.AddService(monitor);
-        serviceCollection.AddService(randomService);
         var bus = new BareBonesBus(serviceCollection);
 
         object sentEvent = new
@@ -23,17 +19,15 @@ public class BusTests
         await bus.Publish(sentEvent, Constants.EventName);
         await bus.Publish(sentEvent, Constants.EventName);
     }
+    // design a test setut, have unique listener and event for each test or somehow share one and clutter it?
+    // test for dependency injection,
+    // missing properties should/shouldnot throw?,
+    // what should happen if something throws?,
+    // monitoring setup with opentelemetry,
+
 }
 
 
-internal class ListernerMonitor
-{
-    public List<object> RecievedEvents { get; set; } = new List<object>();
-}
-internal class RandomService
-{
-
-}
 internal class ServiceCollection : IServiceProvider
 {
     private readonly Dictionary<Type, object> _services = new();
