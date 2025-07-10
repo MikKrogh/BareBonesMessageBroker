@@ -15,10 +15,10 @@ namespace BarebonesMessageBroker
     public interface IBus
     {
         Task Publish(object t, string EventType);
-        void Configure(Action<BusConfig> configure);
-        public class BusConfig
-        {
-        }
+        //void Configure(Action<BusConfig> configure);
+        //public class BusConfig
+        //{
+        //}
     }
 
 

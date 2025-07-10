@@ -1,9 +1,9 @@
 ﻿
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Frozen;
 using System.Data;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using static BarebonesMessageBroker.IBus;
 
 [assembly: InternalsVisibleTo("BarebonesMessageBroker.Tests")]
 namespace BarebonesMessageBroker;
@@ -14,8 +14,10 @@ public class BareBonesBus : IBus
     private Dictionary<Type, Type> _cachedEventsForListeners = new Dictionary<Type, Type>();
     private Dictionary<Type, Type[]> _cachedListenerDependencies = new Dictionary<Type, Type[]>();
     private Dictionary<Type, PropertyInfo[]> _cachedEventProperties = new Dictionary<Type, PropertyInfo[]>();
-    private readonly IServiceProvider _services;
-    public BareBonesBus(IServiceProvider services)
+    
+    private readonly IServiceScopeFactory _scopeFactory;
+
+    public BareBonesBus(IServiceScopeFactory scopeFactory)
     {
         var setup = new BareBonesBusSetup();
         var listeners = setup.ScanForListeners();
@@ -23,11 +25,7 @@ public class BareBonesBus : IBus
         {
             eventListerners = listeners;
         }
-        _services = services;
-    }
-    public void Configure(Action<BusConfig> configure)
-    {
-        throw new NotImplementedException();
+        this._scopeFactory = scopeFactory;
     }
     //| PublishSomeEvent | 4.029 us | 0.0802 us | 0.1777 us | 0.2747 |    2.3 KB | + cahed props on event type
     //| PublishSomeEvent | 4.966 us | 0.0981 us | 0.1241 us | 0.3204 |   2.62 KB | + events for listener cached
@@ -40,19 +38,25 @@ public class BareBonesBus : IBus
         {
             foreach (var listenerType in eventListerners[EventType])
             {
-                object? typeInstance = CreateInstance(listenerType);
-                if (typeInstance is null) throw new NoNullAllowedException($"Could not create instance of listener type {listenerType.FullName}.");
+                try
+                {
+                    object? typeInstance = CreateInstance(listenerType);
+                    if (typeInstance is null) throw new NoNullAllowedException($"Could not create instance of listener type {listenerType.FullName}.");
 
-                Type eventType = GetEventType(listenerType);
-                var listenerEvent = DeserializeMessage<Event>(message, eventType);
-                if (listenerEvent is null) 
-                    throw new NoNullAllowedException($"Could not deserialize message to event type {eventType.FullName}.");
+                    Type eventType = GetEventType(listenerType);
+                    var listenerEvent = DeserializeMessage<Event>(message, eventType);
+                    if (listenerEvent is null) 
+                        throw new NoNullAllowedException($"Could not deserialize message to event type {eventType.FullName}.");
 
-                Type listenerInterface = typeof(Listener<>).MakeGenericType(eventType);
-                var handleMethod = listenerType.GetMethod("Handle");
-                Task task = (Task?)handleMethod?.Invoke(typeInstance,  new[] { listenerEvent } );
-                await task;
-
+                    Type listenerInterface = typeof(Listener<>).MakeGenericType(eventType);
+                    var handleMethod = listenerType.GetMethod("Handle");
+                    Task task = (Task?)handleMethod?.Invoke(typeInstance,  new[] { listenerEvent } );
+                    await task;
+                }
+                catch (Exception e)
+                {
+                    throw;
+                }
             }
         }
     }
@@ -74,23 +78,37 @@ public class BareBonesBus : IBus
 
     private object? CreateInstance(Type listenerType)
     {
-        if (!_cachedListenerDependencies.ContainsKey(listenerType))
+        try
         {
-            var ctor = listenerType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
-            var dependencies = ctor.GetParameters().Select(p => p.ParameterType);
-            _cachedListenerDependencies.Add(listenerType, dependencies.ToArray());
-        }
-        var services = new List<object>();
-        foreach (var dependency in _cachedListenerDependencies[listenerType])
-        {
-            var service = _services.GetService(dependency);
-            if (service is null)
-                throw new InvalidOperationException($"Service of type {dependency.FullName} not registered.");
-            services.Add(service);
-        }
+            if (!_cachedListenerDependencies.ContainsKey(listenerType))
+            {
+                var ctor = listenerType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
+                var dependencies = ctor.GetParameters().Select(p => p.ParameterType);
+                _cachedListenerDependencies.Add(listenerType, dependencies.ToArray());
+            }
 
-        var TypeInstance = Activator.CreateInstance(listenerType, services.ToArray());
-        return TypeInstance;
+            var services = new List<object>();
+            foreach (var dependency in _cachedListenerDependencies[listenerType])
+            {
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var scopedProvider = scope.ServiceProvider;
+                        var service = scopedProvider.GetService(dependency);
+                        if(service is null)
+                        {
+                            throw new NoNullAllowedException($"Could not resolve service of type {dependency.FullName} for listener {listenerType.FullName}.");
+                        }
+                        services.Add(service);                
+                }
+            }
+            var TypeInstance = Activator.CreateInstance(listenerType, services.ToArray());
+
+            return TypeInstance;
+        }
+        catch (Exception e)
+        {
+            throw;
+        }
     }
 
     private Tevent? DeserializeMessage<Tevent>(object message, Type returnedInstance) where Tevent : Event
