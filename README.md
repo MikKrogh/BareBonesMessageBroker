@@ -7,4 +7,4 @@ currently only supports events containing simple types like int,string,long,doub
      test for dependency injection,
      missing properties should/shouldnot throw?,
      what should happen if something throws?,
-     monitoring setup with opentelemetry,
+     monitoring setup with opentelemetry
