@@ -24,7 +24,7 @@ public class BusPublishBenchmark
             IntValue = 123,
             LongValue = 456789L,
         };
-        _bus = new BareBonesBus(new ServiceCollection());
+        _bus = new BareBonesBus(new ScopeFactory());
     }
 
     [Benchmark]

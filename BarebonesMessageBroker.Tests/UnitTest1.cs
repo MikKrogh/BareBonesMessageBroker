@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace BarebonesMessageBroker.Tests;
 
 public class BusTests
@@ -5,8 +7,8 @@ public class BusTests
     [Fact]
     public async Task WhenOneListenerExists_WhenEventIsPublished_ThenListenerGetsCorrectlyMappedProperties()
     {
-        ServiceCollection serviceCollection = new ServiceCollection();
-        var bus = new BareBonesBus(serviceCollection);
+        var sf = new ScopeFactory();
+        var bus = new BareBonesBus(sf);
 
         object sentEvent = new
         {
@@ -42,5 +44,27 @@ internal class ServiceCollection : IServiceProvider
     public void AddService<TService>(TService service)
     {
         _services[typeof(TService)] = service;
+    }
+}
+
+internal class ScopeFactory : IServiceScopeFactory
+{
+    public IServiceScope CreateScope()
+    {
+        return new scoper();
+
+    }
+}
+
+internal class scoper : IServiceScope
+{
+    public IServiceProvider ServiceProvider {get; private set; }
+    public scoper()
+    {
+        ServiceProvider = new ServiceCollection();
+    }
+    public void Dispose()
+    {
+        ServiceProvider = null!;
     }
 }
