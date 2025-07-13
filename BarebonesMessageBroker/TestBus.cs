@@ -1,21 +1,24 @@
-﻿
-
+﻿using Microsoft.Extensions.DependencyInjection;
 
 namespace BarebonesMessageBroker;
 
 public class TestBus : IBus
 {
     private readonly List<PublishedEvent> _publishedEvents = new();
+    private readonly IBus _bus;
+    public TestBus(IServiceScopeFactory scopeFactory)
+    {        
+        _bus = new BareBonesBus(scopeFactory);
+    }
 
-    public Task Publish(object message, string eventType)
+    public async Task Publish(object message, string eventType)
     {
+        await _bus.Publish(message, eventType);
         _publishedEvents.Add(new PublishedEvent
         {
             EventName = eventType,
             Message = message
         });
-
-        return Task.CompletedTask;
     }
 
     public IReadOnlyList<PublishedEvent> PublishedEvents => _publishedEvents.AsReadOnly();

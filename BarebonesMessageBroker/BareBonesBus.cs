@@ -40,18 +40,21 @@ public class BareBonesBus : IBus
             {
                 try
                 {
-                    object? typeInstance = CreateInstance(listenerType);
-                    if (typeInstance is null) throw new NoNullAllowedException($"Could not create instance of listener type {listenerType.FullName}.");
+                    using var scope = _scopeFactory.CreateScope();
+                    {
+                        object? typeInstance = CreateInstance(listenerType, scope);
+                        if (typeInstance is null) throw new NoNullAllowedException($"Could not create instance of listener type {listenerType.FullName}.");
 
-                    Type eventType = GetEventType(listenerType);
-                    var listenerEvent = DeserializeMessage<Event>(message, eventType);
-                    if (listenerEvent is null) 
-                        throw new NoNullAllowedException($"Could not deserialize message to event type {eventType.FullName}.");
+                        Type eventType = GetEventType(listenerType);
+                        var listenerEvent = DeserializeMessage<Event>(message, eventType);
+                        if (listenerEvent is null) 
+                            throw new NoNullAllowedException($"Could not deserialize message to event type {eventType.FullName}.");
 
-                    Type listenerInterface = typeof(Listener<>).MakeGenericType(eventType);
-                    var handleMethod = listenerType.GetMethod("Handle");
-                    Task task = (Task?)handleMethod?.Invoke(typeInstance,  new[] { listenerEvent } );
-                    await task;
+                        Type listenerInterface = typeof(Listener<>).MakeGenericType(eventType);
+                        var handleMethod = listenerType.GetMethod("Handle");
+                        Task task = (Task?)handleMethod?.Invoke(typeInstance,  new[] { listenerEvent } );
+                        await task;
+                    }
                 }
                 catch (Exception e)
                 {
@@ -76,7 +79,7 @@ public class BareBonesBus : IBus
         return _cachedEventsForListeners[listenerType];
     }
 
-    private object? CreateInstance(Type listenerType)
+    private object? CreateInstance(Type listenerType, IServiceScope scope)
     {
         try
         {
@@ -86,20 +89,18 @@ public class BareBonesBus : IBus
                 var dependencies = ctor.GetParameters().Select(p => p.ParameterType);
                 _cachedListenerDependencies.Add(listenerType, dependencies.ToArray());
             }
-
+            var scopedProvider = scope.ServiceProvider;
             var services = new List<object>();
             foreach (var dependency in _cachedListenerDependencies[listenerType])
             {
-                using (var scope = _scopeFactory.CreateScope())
-                {
-                    var scopedProvider = scope.ServiceProvider;
+                
                         var service = scopedProvider.GetService(dependency);
                         if(service is null)
                         {
                             throw new NoNullAllowedException($"Could not resolve service of type {dependency.FullName} for listener {listenerType.FullName}.");
                         }
                         services.Add(service);                
-                }
+                
             }
             var TypeInstance = Activator.CreateInstance(listenerType, services.ToArray());
 
